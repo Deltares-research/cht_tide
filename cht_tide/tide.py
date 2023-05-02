@@ -310,18 +310,6 @@ class Tide(object):
     def _tidal_series(t, amplitude, phase, speed, u, f, V0):
         return np.sum(amplitude * f * np.cos(speed * t + (V0 + u) - phase), axis=0)
 
-    def normalize(self):
-        """
-        Adapt self.model so that amplitudes are positive and phases are in [0,360) as per convention
-        """
-        for i in range(len(self.model)):
-            if self.model["amplitude"][i] < 0:
-                # for i, (_, amplitude, phase) in enumerate(self.model):
-                # 	if amplitude < 0:
-                self.model["amplitude"][i] = -amplitude
-                self.model["phase"][i] = phase + 180.0
-            self.model["phase"][i] = np.mod(self.model["phase"][i], 360.0)
-
     @classmethod
     def decompose(
         cls,

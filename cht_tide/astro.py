@@ -23,6 +23,7 @@
 #   along with this library.  If not, see <http://www.gnu.org/licenses/>.
 #   --------------------------------------------------------------------
 from collections import namedtuple
+
 import numpy as np
 
 d2r, r2d = np.pi / 180.0, 180.0 / np.pi
@@ -215,7 +216,7 @@ def astro(t):
     # Some other parameters defined by Schureman which are dependent on the
     # parameters N, i, omega for use in node factor calculations. We don't need
     # their speeds.
-    args = list(each.value for each in [a["N"], a["i"], a["omega"]])
+    args = [each.value for each in [a["N"], a["i"], a["omega"]]]
     for name, function in {
         "I": _I,
         "xi": _xi,
