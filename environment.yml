@@ -1,0 +1,15 @@
+name: cht_tide
+
+channels:
+  - conda-forge
+
+dependencies:
+  - black
+  - build
+  - mypy
+  - pip
+  - numpy
+  - scipy
+  - pytest
+  - python=3.10
+  - twine
