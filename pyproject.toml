@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cht_tide"
-description = "Download tide gauge observation data"
+description = "Combining of tidal components to time series"
 readme = "README.md"
 authors = [
     { name = "Julian Hofer", email = "Julian.Hofer@deltares.nl" },
