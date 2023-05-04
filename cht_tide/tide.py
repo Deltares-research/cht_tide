@@ -311,16 +311,13 @@ class Tide(object):
 
     def normalize(self):
         """
-		Adapt self.model so that amplitudes are positive and phases are in [0,360) as per convention
-		"""
+        Adapt self.model so that amplitudes are positive and phases are in [0,360) as per convention
+        """
         for i in range(len(self.model)):
-            if self.model['amplitude'][i] < 0:
-                                
-		#for i, (_, amplitude, phase) in enumerate(self.model):
-		#	if amplitude < 0:
-                self.model['amplitude'][i] = -amplitude
-                self.model['phase'][i] = phase + 180.0
-            self.model['phase'][i] = np.mod(self.model['phase'][i], 360.0)
+            if self.model["amplitude"][i] < 0:
+                self.model["amplitude"][i] = -self.model["amplitude"][i]
+                self.model["phase"][i] = self.model["phase"][i] + 180.0
+            self.model["phase"][i] = np.mod(self.model["phase"][i], 360.0)
 
     @classmethod
     def decompose(
