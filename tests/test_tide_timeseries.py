@@ -88,7 +88,7 @@ def test_read_bca_file():
 
     assert len(flow_boundary_points) == 28
     assert type(flow_boundary_points[0].astro) == pd.DataFrame
-    
+
 
 def test_read_bca_and_predict_timeseries():
     test_folder = Path().absolute() / "tests"
