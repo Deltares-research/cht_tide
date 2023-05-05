@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pandas as pd
 
+from cht_tide.read_bca import read_astro_boundary_conditions, read_flow_boundary_points
 from cht_tide.tide_predict import predict
 
 
@@ -68,6 +71,39 @@ def test_timeseries_from_components():
 
     # Predict the tide
     v = predict(df, times)
+
+    assert v.dtype == "float64"
+    assert len(times) == len(v)
+
+
+def test_read_bca_file():
+    test_folder = Path().absolute() / "tests"
+    bca_file = test_folder.joinpath("sfincs.bca")
+    bnd_file = test_folder.joinpath("sfincs.bnd")
+
+    flow_boundary_points = read_flow_boundary_points(bnd_file)
+    flow_boundary_points = read_astro_boundary_conditions(
+        bca_file, flow_boundary_points
+    )
+
+    assert len(flow_boundary_points) == 28
+    assert type(flow_boundary_points[0].astro) == pd.DataFrame
+    
+
+def test_read_bca_and_predict_timeseries():
+    test_folder = Path().absolute() / "tests"
+    bca_file = test_folder.joinpath("sfincs.bca")
+    bnd_file = test_folder.joinpath("sfincs.bnd")
+
+    flow_boundary_points = read_flow_boundary_points(bnd_file)
+    flow_boundary_points = read_astro_boundary_conditions(
+        bca_file, flow_boundary_points
+    )
+
+    times = pd.date_range(start="2023-01-01", end="2023-01-02", freq="10T")
+
+    # Predict the tide
+    v = predict(flow_boundary_points[0].astro, times)
 
     assert v.dtype == "float64"
     assert len(times) == len(v)
