@@ -3,42 +3,49 @@ import os
 import pandas as pd
 
 
-def read_flow_boundary_points(bnd_file: None):
-    # Read SFINCS bnd file
-    if not bnd_file:
-        return
+class SfincsBoundary:
+    def __init__(self):
+        self.flow_boundary_points = []
 
-    if not os.path.exists(bnd_file):
-        return
+    def read_flow_boundary_points(self, bnd_file: None):
+        # Read SFINCS bnd file
+        if not bnd_file:
+            return
 
-    flow_boundary_points = []
+        if not os.path.exists(bnd_file):
+            return
 
-    # Read the bnd file
-    df = pd.read_csv(
-        bnd_file, index_col=False, header=None, delim_whitespace=True, names=["x", "y"]
-    )
+        # Read the bnd file
+        df = pd.read_csv(
+            bnd_file,
+            index_col=False,
+            header=None,
+            delim_whitespace=True,
+            names=["x", "y"],
+        )
 
-    # Loop through points
-    for ind in range(len(df.x.values)):
-        name = str(ind + 1).zfill(4)
-        point = FlowBoundaryPoint(df.x.to_numpy()[ind], df.y.to_numpy()[ind], name=name)
-        flow_boundary_points.append(point)
+        # Loop through points
+        for ind in range(len(df.x.values)):
+            name = str(ind + 1).zfill(4)
+            point = FlowBoundaryPoint(
+                df.x.to_numpy()[ind], df.y.to_numpy()[ind], name=name
+            )
+            self.flow_boundary_points.append(point)
 
-    return flow_boundary_points
+        return self
 
+    def read_astro_boundary_conditions(self, bca_file):
+        if not bca_file:
+            return
 
-def read_astro_boundary_conditions(bca_file, flow_boundary_points):
-    if not bca_file:
-        return
+        if not os.path.exists(bca_file):
+            return
 
-    if not os.path.exists(bca_file):
-        return
+        d = IniStruct(filename=bca_file)
+        for ind, point in enumerate(self.flow_boundary_points):
+            point.astro = d.section[ind].data
 
-    d = IniStruct(filename=bca_file)
-    for ind, point in enumerate(flow_boundary_points):
-        point.astro = d.section[ind].data
-
-    return flow_boundary_points
+        return self
 
 
 # Classes for information about boundary points

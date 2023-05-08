@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from cht_tide.read_bca import read_astro_boundary_conditions, read_flow_boundary_points
+from cht_tide.read_bca import SfincsBoundary
 from cht_tide.tide_predict import predict
 
 
@@ -81,13 +81,12 @@ def test_read_bca_file():
     bca_file = test_folder.joinpath("sfincs.bca")
     bnd_file = test_folder.joinpath("sfincs.bnd")
 
-    flow_boundary_points = read_flow_boundary_points(bnd_file)
-    flow_boundary_points = read_astro_boundary_conditions(
-        bca_file, flow_boundary_points
-    )
+    sb = SfincsBoundary()
+    sb.read_flow_boundary_points(bnd_file)
+    sb.read_astro_boundary_conditions(bca_file)
 
-    assert len(flow_boundary_points) == 28
-    assert type(flow_boundary_points[0].astro) == pd.DataFrame
+    assert len(sb.flow_boundary_points) == 28
+    assert type(sb.flow_boundary_points[0].astro) == pd.DataFrame
 
 
 def test_read_bca_and_predict_timeseries():
@@ -95,15 +94,14 @@ def test_read_bca_and_predict_timeseries():
     bca_file = test_folder.joinpath("sfincs.bca")
     bnd_file = test_folder.joinpath("sfincs.bnd")
 
-    flow_boundary_points = read_flow_boundary_points(bnd_file)
-    flow_boundary_points = read_astro_boundary_conditions(
-        bca_file, flow_boundary_points
-    )
+    sb = SfincsBoundary()
+    sb.read_flow_boundary_points(bnd_file)
+    sb.read_astro_boundary_conditions(bca_file)
 
     times = pd.date_range(start="2023-01-01", end="2023-01-02", freq="10T")
 
     # Predict the tide
-    v = predict(flow_boundary_points[0].astro, times)
+    v = predict(sb.flow_boundary_points[0].astro, times)
 
     assert v.dtype == "float64"
     assert len(times) == len(v)
