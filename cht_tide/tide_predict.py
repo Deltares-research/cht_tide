@@ -39,4 +39,3 @@ def predict(data, times):
     v = td.at(times)
 
     return v
-    return v

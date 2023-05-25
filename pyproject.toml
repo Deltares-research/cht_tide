@@ -7,6 +7,7 @@ name = "cht_tide"
 description = "Combining of tidal components to time series"
 readme = "README.md"
 authors = [
+    { name = "Maarten van Ormondt", email = "maarten.vanormondt@deltares.nl"},
     { name = "Julian Hofer", email = "Julian.Hofer@deltares.nl" },
     { name = "Sarwan Peiter", email = "Sarwan.Peiter@deltares.nl" },
 ]
@@ -35,6 +36,6 @@ include = ["cht_tide"]
 "cht_observations" = ["py.typed"]
 
 # TODO
-#[project.urls]
+[project.urls]
+Source = "https://github.com/Deltares/cht_tide"
 #Documentation = "https://deltares.github.io/CoastalHazardTools"
-#Source = "https://github.com/Deltares/CoastalHazardTools"
