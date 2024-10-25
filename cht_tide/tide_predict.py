@@ -11,30 +11,38 @@ from cht_tide.tide import Tide
 
 def predict(data, times):
     all_constituents = [c for c in cons.noaa if c != cons._Z0]
-
     constituents = []
+    amplitudes   = []
+    phases       = []
     for name in data.index.to_list():
+        okay = False
+        noaa_name = name
         if name == "MM":
-            name = "Mm"
+            noaa_name = "Mm"
         if name == "MF":
-            name = "Mf"
+            noaa_name = "Mf"
         if name == "SA":
-            name = "Sa"
+            noaa_name = "Sa"
         if name == "SSA":
-            name = "Ssa"
+            noaa_name = "Ssa"
         if name == "MU2":
-            name = "mu2"
+            noaa_name = "mu2"
         if name == "NU2":
-            name = "nu2"
+            noaa_name = "nu2"
         for cnst in all_constituents:
-            if cnst.name == name:
+            if cnst.name == noaa_name:
                 constituents.append(cnst)
+                amplitudes.append(data.loc[name, "amplitude"])
+                phases.append(data.loc[name, "phase"])
+                okay = True                
                 continue
+        if not okay:    
+            print(f"Constituent {name} not found in list of NOAA constituents ! Skipping ...")    
 
     td = Tide(
         constituents=constituents,
-        amplitudes=data.iloc[:, 0].to_list(),
-        phases=data.iloc[:, 1].to_list(),
+        amplitudes=amplitudes,
+        phases=phases,
     )
     v = td.at(times)
 
