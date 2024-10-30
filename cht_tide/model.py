@@ -88,8 +88,8 @@ class TideModel:
                 # Now convert back to amplitude and phase
                 dsp["amplitude"] = np.sqrt(dsp.tvu**2 + dsp.tvv**2)
                 dsp["phase"] = np.mod(np.arctan2(dsp.tvv, dsp.tvu) * 180.0 / np.pi, 360.0)
-                df["amplitude"] = dsp.amplitude.to_numpy()
-                df["phase"] = dsp.phase.to_numpy()
+                df["amplitude"] = dsp.amplitude.values
+                df["phase"] = dsp.phase.values
                 df = df.set_index("constituent")
                 gdf.at[i, "astro"] = df
             return gdf
@@ -100,8 +100,8 @@ class TideModel:
                 dsp = ds.interp(lon=np.array(row.geometry.x), lat=np.array(row.geometry.y))
                 df = pd.DataFrame()
                 df["constituent"] = constituents
-                df["amplitude"] = dsp.amplitude.to_numpy()
-                df["phase"] = dsp.phase.to_numpy()
+                df["amplitude"] = dsp.amplitude.values
+                df["phase"] = dsp.phase.values
                 df.set_index("constituent")
                 lst.append(df)
             return lst

@@ -72,8 +72,8 @@ class TideModelFes2014(TideModel):
             filename = os.path.join(self.path, f"{constituent}.nc")
             ds0 = xr.open_dataset(filename).sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
             # Add data to xarray dataset
-            ds["amplitude"].loc[constituent] = ds0["amplitude"].to_numpy() / 100.0 # Convert cm to m
-            ds["phase"].loc[constituent] = ds0["phase"].to_numpy()
+            ds["amplitude"].loc[constituent] = ds0["amplitude"].values / 100.0 # Convert cm to m
+            ds["phase"].loc[constituent] = ds0["phase"].values
             ds0.close()
         
         return ds
