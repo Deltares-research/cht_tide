@@ -11,6 +11,10 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 from pyproj import CRS
+import boto3
+from botocore import UNSIGNED
+from botocore.client import Config
+from  cht_utils import fileops as fo
 
 class TideModel:
     """
@@ -22,6 +26,7 @@ class TideModel:
         self.long_name         = ""
         self.path              = ""
         self.main_constituents = ["M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1"]
+        self.files             = []
 
     def read_metadata(self):
         # Read metadata file
@@ -37,12 +42,30 @@ class TideModel:
             self.long_name = self.name        
 
         self.crs = CRS(4326)
+
+    def download(self):
+        if self.s3_bucket is None:
+            return
+        # Check if download is needed
+        for file in self.files:
+            if not os.path.exists(os.path.join(self.path, file)):
+                s3_client = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+                break
+        # Get all files defined in the toml file
+        for file in self.files:
+            if not os.path.exists(os.path.join(self.path, file)):
+                print(f"Downloading {file} from tide model {self.name} ...")
+                s3_client.download_file(self.s3_bucket, f"{self.s3_key}/{file}", os.path.join(self.path, file))
             
     def get_data_on_points(self, gdf=None, x=None, y=None, crs=None, format="gdf", constituents="all"):
         """
         x can be a list of x coordinates, or and array of x coordinates
         y can be a list of y coordinates, or and array of y coordinates
         """
+
+        # Download files if needed
+        self.download()
+
         # Return pandas dataframe with constituents as rows and amplitudes and phases as columns
 
         if constituents == "all":
