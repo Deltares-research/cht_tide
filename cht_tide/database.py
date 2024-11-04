@@ -47,7 +47,7 @@ class TideModelDatabase:
             os.makedirs(self.path)
 
         # Read in database
-        tml_file = os.path.join(self.path, "tidemodels.tml")
+        tml_file = os.path.join(self.path, "tide_models.tml")
         if not os.path.exists(tml_file):
             print("Warning! Tide model database file not found: " + tml_file)
             return
@@ -86,8 +86,8 @@ class TideModelDatabase:
         if self.s3_bucket is None:
             return
         # First download a copy of bathymetry.tml and call it bathymetry_s3.tml
-        key = f"{self.s3_key}/tidemodels.tml"
-        filename = os.path.join(self.path, "tidemodels_s3.tml")
+        key = f"{self.s3_key}/tide_models.tml"
+        filename = os.path.join(self.path, "tide_models_s3.tml")
         print("Updating tide models database ...")
         try:
             self.s3_client.download_file(Bucket=self.s3_bucket,     # assign bucket name
@@ -138,7 +138,7 @@ class TideModelDatabase:
             for name in added_names:
                 d["dataset"].append({"name": name})
             # Now write the new bathymetry.tml
-            with open(os.path.join(self.path, "tidemodels.tml"), "w") as tml:
+            with open(os.path.join(self.path, "tide_models.tml"), "w") as tml:
                 toml.dump(d, tml)            
             # Read the database again
             self.dataset = []
@@ -161,13 +161,13 @@ class TideModelDatabase:
         return short_name_list, long_name_list
 
 
-def dict2yaml(file_name, dct, sort_keys=False):
-    yaml_string = yaml.dump(dct, sort_keys=sort_keys)    
-    file = open(file_name, "w")  
-    file.write(yaml_string)
-    file.close()
+# def dict2yaml(file_name, dct, sort_keys=False):
+#     yaml_string = yaml.dump(dct, sort_keys=sort_keys)    
+#     file = open(file_name, "w")  
+#     file.write(yaml_string)
+#     file.close()
 
-def yaml2dict(file_name):
-    file = open(file_name,"r")
-    dct = yaml.load(file, Loader=yaml.FullLoader)
-    return dct
+# def yaml2dict(file_name):
+#     file = open(file_name,"r")
+#     dct = yaml.load(file, Loader=yaml.FullLoader)
+#     return dct
