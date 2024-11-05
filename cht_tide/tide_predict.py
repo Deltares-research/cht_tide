@@ -32,8 +32,17 @@ def predict(data, times):
         for cnst in all_constituents:
             if cnst.name == noaa_name:
                 constituents.append(cnst)
-                amplitudes.append(data.loc[name, "amplitude"])
-                phases.append(data.loc[name, "phase"])
+                # Check if amplitude is a column in the data
+                if "amplitude" in data.columns:
+                    amplitudes.append(data.loc[name, "amplitude"])
+                else:
+                    # Assume it is the first non-index column
+                    amplitudes.append(data.loc[name, 1])
+                if "phase" in data.columns:
+                    phases.append(data.loc[name, "phase"])
+                else:
+                    # Assume it is the second non-index column
+                    phases.append(data.loc[name, 2])    
                 okay = True                
                 continue
         if not okay:    
