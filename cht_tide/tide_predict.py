@@ -4,12 +4,12 @@ Created on Wed May 19 14:25:56 2021
 
 @author: ormondt
 """
-
+import pandas as pd
 import cht_tide.constituent as cons
 from cht_tide.tide import Tide
 
 
-def predict(data, times):
+def predict(data, times, format="np"):
     all_constituents = [c for c in cons.noaa if c != cons._Z0]
     constituents = []
     amplitudes   = []
@@ -54,5 +54,9 @@ def predict(data, times):
         phases=phases,
     )
     v = td.at(times)
+
+    if format == "dataframe" or format == "df":
+        # Convert numpy array v to dataframe where index is time
+        v = pd.DataFrame(v, index=times)
 
     return v

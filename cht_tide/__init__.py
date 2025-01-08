@@ -8,3 +8,5 @@ __version__ = "0.0.1"
 
 from .model import TideModel
 from .database import TideModelDatabase
+from .tide_stations import TideStationsDatabase
+from .tide_predict import predict
