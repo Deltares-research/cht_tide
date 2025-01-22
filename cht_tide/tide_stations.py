@@ -52,7 +52,7 @@ class TideStationsDataset:
             print("Warning! Tide stations dataset file not found: " + filename)
             return
         # Read the netcdf file using xarray
-        self.data = xr.open_dataset(filename)
+        self.data = xr.load_dataset(filename)
         # Loop through stations
         nr_stations = len(self.data["lon"])
         self.station = []

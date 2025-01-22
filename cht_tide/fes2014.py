@@ -52,12 +52,11 @@ class TideModelFes2014(TideModel):
 
         # Get dimensions from first file
         filename = os.path.join(self.path, f"{constituents[0]}.nc")
-        ds0 = xr.open_dataset(filename).sel(
-            lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1])
-        )
-        lon = ds0.lon
-        lat = ds0.lat
-        ds0.close()
+        with xr.open_dataset(filename) as data:
+            ds0 = data.sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
+            lon = ds0.lon
+            lat = ds0.lat
+
         # Set constituent dimension
         ds["constituent"] = constituents
         # Set lon and lat dimensions
@@ -79,14 +78,10 @@ class TideModelFes2014(TideModel):
         for constituent in constituents:
             # Get data for constituent
             filename = os.path.join(self.path, f"{constituent}.nc")
-            ds0 = xr.open_dataset(filename).sel(
-                lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1])
-            )
-            # Add data to xarray dataset
-            ds["amplitude"].loc[constituent] = (
-                ds0["amplitude"].to_numpy() / 100.0
-            )  # Convert cm to m
-            ds["phase"].loc[constituent] = ds0["phase"].to_numpy()
-            ds0.close()
+            with xr.open_dataset(filename) as data:
+                ds = data.sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
+                # Add data to xarray dataset
+                ds["amplitude"].loc[constituent] = ds0["amplitude"].to_numpy() / 100.0
+                ds["phase"].loc[constituent] = ds0["phase"].to_numpy()
 
         return ds
