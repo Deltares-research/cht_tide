@@ -6,18 +6,19 @@ Created on Sun Apr 25 10:58:08 2021
 """
 
 import os
+
+import boto3
+import geopandas as gpd
 import numpy as np
 import pandas as pd
+import shapely
 import toml
-import boto3
 import xarray as xr
 from botocore import UNSIGNED
 from botocore.client import Config
 
-import geopandas as gpd
-import shapely
+from cht_tide.tide_predict import predict
 
-from .tide_predict import predict
 
 class TideStationsDataset:
     def __init__(self, name, path):
@@ -30,7 +31,10 @@ class TideStationsDataset:
 
     def read_metadata(self):
         if not os.path.exists(os.path.join(self.path, "metadata.tml")):
-            print("Warning! Tide stations metadata file not found: " + os.path.join(self.path, "metadata.tml"))
+            print(
+                "Warning! Tide stations metadata file not found: "
+                + os.path.join(self.path, "metadata.tml")
+            )
             return
         metadata = toml.load(os.path.join(self.path, "metadata.tml"))
         if "longname" in metadata:
@@ -56,27 +60,29 @@ class TideStationsDataset:
             station = {}
             # name
             name = "unknown"
-            name_s1 = self.data["stations"][:,i].values
+            name_s1 = self.data["stations"][:, i].to_numpy()
             # convert dtype='|S1' to string
             try:
                 name = "".join([x.decode("utf-8") for x in name_s1]).strip()
-            except:
-                print("Error decoding name")           
+            except Exception:
+                print("Error decoding name")
             # id
-            id_s1 = self.data["idcodes"][:,i].values
+            id_s1 = self.data["idcodes"][:, i].to_numpy()
             # convert dtype='|S1' to string
             id = "".join([x.decode("utf-8") for x in id_s1]).strip()
             station["name"] = name
             station["id"] = id
-            station["lon"] = self.data["lon"][i].values
-            station["lat"] = self.data["lat"][i].values
+            station["lon"] = self.data["lon"][i].to_numpy()
+            station["lat"] = self.data["lat"][i].to_numpy()
             self.station.append(station)
         # Read the components
         nr_components = np.shape(self.data["components"])[1]
         self.components = []
         for i in range(nr_components):
-            components_s1 = self.data["components"][:,i].values
-            self.components.append("".join([x.decode("utf-8") for x in components_s1]).strip())
+            components_s1 = self.data["components"][:, i].to_numpy()
+            self.components.append(
+                "".join([x.decode("utf-8") for x in components_s1]).strip()
+            )
 
         self.data.close()
 
@@ -89,7 +95,7 @@ class TideStationsDataset:
             if station["name"] == name:
                 return i
         return None
-    
+
     def find_index_by_id(self, id):
         if not self.is_read:
             self.read_data()
@@ -97,7 +103,7 @@ class TideStationsDataset:
             if station["id"] == id:
                 return i
         return None
-    
+
     def get_components(self, name=None, id=None, index=None, sort=True):
         """Return Pandas dataframe with the tidal components for a station"""
         if name is not None:
@@ -113,11 +119,13 @@ class TideStationsDataset:
         if not self.is_read:
             self.read_data()
         # Get the amplitudes
-        amplitudes = self.data["amplitude"][:,i].values
+        amplitudes = self.data["amplitude"][:, i].to_numpy()
         # Get the phases
-        phases = self.data["phase"][:,i].values
+        phases = self.data["phase"][:, i].to_numpy()
         # Create a dataframe
-        df = pd.DataFrame({"constituent": self.components, "amplitude": amplitudes, "phase": phases})
+        df = pd.DataFrame(
+            {"constituent": self.components, "amplitude": amplitudes, "phase": phases}
+        )
         df = df.set_index("constituent")
         if sort:
             # Sort by amplitude
@@ -126,7 +134,18 @@ class TideStationsDataset:
             df = df[df.amplitude > 0.0]
         return df
 
-    def predict(self, name=None, id=None, start=None, end=None, t=None, dt=None, offset=0.0, format="tek", filename=None):
+    def predict(
+        self,
+        name=None,
+        id=None,
+        start=None,
+        end=None,
+        t=None,
+        dt=None,
+        offset=0.0,
+        format="tek",
+        filename=None,
+    ):
         if name is not None:
             components = self.get_components(name=name)
         elif id is not None:
@@ -141,7 +160,7 @@ class TideStationsDataset:
             if isinstance(end, str):
                 end = pd.to_datetime(end)
             if dt is None:
-                dt = 600.0 # seconds
+                dt = 600.0  # seconds
             times = pd.date_range(start=start, end=end, freq=f"{dt}s")
         elif t is not None:
             times = t
@@ -158,11 +177,11 @@ class TideStationsDataset:
                 # Write to a .csv file, skipping the header
                 prd.to_csv(filename, header=False)
         return prd
-        
+
     def get_gdf(self):
         if not self.is_read:
             self.read_data()
-        if len(self.gdf) == 0:    
+        if len(self.gdf) == 0:
             gdf_list = []
             # Loop through points
             for station in self.station:
@@ -171,7 +190,7 @@ class TideStationsDataset:
                 gdf_list.append(d)
             self.gdf = gpd.GeoDataFrame(gdf_list, crs=4326)
         return self.gdf
-    
+
     def station_names(self):
         """Return lists of station names and ids"""
         name_list = []
@@ -182,34 +201,32 @@ class TideStationsDataset:
             id_list.append(station["id"])
         return name_list, id_list
 
+
 class TideStationsDatabase:
     """
     The main Tide Stations Database class
-    
+
     :param pth: Path name where bathymetry tiles will be cached.
-    :type pth: string            
+    :type pth: string
     """
-    
-    def __init__(self, path=None,
-                 s3_bucket=None,
-                 s3_key=None,
-                 s3_region=None):
-        self.path    = path
+
+    def __init__(self, path=None, s3_bucket=None, s3_key=None, s3_region=None):
+        self.path = path
         self.dataset = {}
         self.s3_client = None
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
         self.s3_region = s3_region
         self.read()
-    
+
     def read(self):
         """
-        Reads meta-data of all datasets in the database. 
+        Reads meta-data of all datasets in the database.
         """
         if self.path is None:
             print("Path to tide stations database not set !")
             return
-        
+
         # Check if the path exists. If not, create it.
         if not os.path.exists(self.path):
             os.makedirs(self.path)
@@ -223,7 +240,6 @@ class TideStationsDatabase:
         datasets = toml.load(tml_file)
 
         for d in datasets["dataset"]:
-
             name = d["name"]
 
             if "path" in d:
@@ -240,12 +256,14 @@ class TideStationsDatabase:
             # else:
             #     print("Could not find metadata file for dataset " + name + " ! Skipping dataset.")
             #     continue
-             
+
             self.dataset[name] = TideStationsDataset(name, path)
 
     def check_online_database(self):
         if self.s3_client is None:
-            self.s3_client = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+            self.s3_client = boto3.client(
+                "s3", config=Config(signature_version=UNSIGNED)
+            )
         if self.s3_bucket is None:
             return
         # First download a copy of bathymetry.tml and call it bathymetry_s3.tml
@@ -253,12 +271,16 @@ class TideStationsDatabase:
         filename = os.path.join(self.path, "tide_stations_s3.tml")
         print("Updating tide stations database ...")
         try:
-            self.s3_client.download_file(Bucket=self.s3_bucket,     # assign bucket name
-                                         Key=key,           # key is the file name
-                                         Filename=filename) # storage file path
-        except:
+            self.s3_client.download_file(
+                Bucket=self.s3_bucket,  # assign bucket name
+                Key=key,  # key is the file name
+                Filename=filename,
+            )  # storage file path
+        except Exception:
             # Download failed
-            print(f"Failed to download {key} from {self.s3_bucket}. Database will not be updated.")
+            print(
+                f"Failed to download {key} from {self.s3_bucket}. Database will not be updated."
+            )
             return
 
         # Read bathymetry_s3.tml
@@ -282,14 +304,16 @@ class TideStationsDatabase:
                 filename = os.path.join(path, "metadata.tml")
                 # Download metadata
                 try:
-                    self.s3_client.download_file(Bucket=self.s3_bucket, # assign bucket name
-                                                Key=key,               # key is the file name
-                                                Filename=filename)     # storage file path
+                    self.s3_client.download_file(
+                        Bucket=self.s3_bucket,  # assign bucket name
+                        Key=key,  # key is the file name
+                        Filename=filename,
+                    )  # storage file path
                 except Exception as e:
                     print(e)
                     print(f"Failed to download {key}. Skipping tide stations dataset.")
                     continue
-                # Necessary data has been downloaded    
+                # Necessary data has been downloaded
                 tide_stations_added = True
                 added_names.append(s3_name)
         # Write new local bathymetry.tml
@@ -302,7 +326,7 @@ class TideStationsDatabase:
                 d["dataset"].append({"name": name})
             # Now write the new bathymetry.tml
             with open(os.path.join(self.path, "tide_stations.tml"), "w") as tml:
-                toml.dump(d, tml)            
+                toml.dump(d, tml)
             # Read the database again
             self.dataset = {}
             self.read()
@@ -330,8 +354,8 @@ class TideStationsDatabase:
 
 
 # def dict2yaml(file_name, dct, sort_keys=False):
-#     yaml_string = yaml.dump(dct, sort_keys=sort_keys)    
-#     file = open(file_name, "w")  
+#     yaml_string = yaml.dump(dct, sort_keys=sort_keys)
+#     file = open(file_name, "w")
 #     file.write(yaml_string)
 #     file.close()
 
@@ -339,6 +363,7 @@ class TideStationsDatabase:
 #     file = open(file_name,"r")
 #     dct = yaml.load(file, Loader=yaml.FullLoader)
 #     return dct
+
 
 def df2tekaltimeseries(df, filename):
     """Write a Pandas dataframe to a .tek file"""

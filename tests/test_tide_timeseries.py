@@ -86,7 +86,7 @@ def test_read_bca_file():
     sb.read_astro_boundary_conditions(bca_file)
 
     assert len(sb.flow_boundary_points) == 28
-    assert type(sb.flow_boundary_points[0].astro) == pd.DataFrame
+    assert isinstance(sb.flow_boundary_points[0].astro, pd.DataFrame)
 
 
 def test_read_bca_and_predict_timeseries():

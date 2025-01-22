@@ -6,42 +6,40 @@ Created on Sun Apr 25 10:58:08 2021
 """
 
 import os
-import yaml
-import toml
+
 import boto3
+import toml
 from botocore import UNSIGNED
 from botocore.client import Config
 
-from .fes2014 import TideModelFes2014
+from cht_tide.fes2014 import TideModelFes2014
+
 
 class TideModelDatabase:
     """
     The main Tide Model Database class
-    
+
     :param pth: Path name where bathymetry tiles will be cached.
-    :type pth: string            
+    :type pth: string
     """
-    
-    def __init__(self, path=None,
-                 s3_bucket=None,
-                 s3_key=None,
-                 s3_region=None):
-        self.path    = path
+
+    def __init__(self, path=None, s3_bucket=None, s3_key=None, s3_region=None):
+        self.path = path
         self.dataset = []
         self.s3_client = None
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
         self.s3_region = s3_region
         self.read()
-    
+
     def read(self):
         """
-        Reads meta-data of all datasets in the database. 
+        Reads meta-data of all datasets in the database.
         """
         if self.path is None:
             print("Path to tide model database not set !")
             return
-        
+
         # Check if the path exists. If not, create it.
         if not os.path.exists(self.path):
             os.makedirs(self.path)
@@ -55,7 +53,6 @@ class TideModelDatabase:
         datasets = toml.load(tml_file)
 
         for d in datasets["dataset"]:
-
             name = d["name"]
 
             if "path" in d:
@@ -70,19 +67,25 @@ class TideModelDatabase:
                 metadata = toml.load(fname)
                 dataset_format = metadata["format"]
             else:
-                print("Could not find metadata file for dataset " + name + " ! Skipping dataset.")
+                print(
+                    "Could not find metadata file for dataset "
+                    + name
+                    + " ! Skipping dataset."
+                )
                 continue
 
             if dataset_format.lower() == "fes2014":
                 model = TideModelFes2014(name, path)
             elif dataset_format.lower() == "tpxo_old":
                 pass
-            
+
             self.dataset.append(model)
 
     def check_online_database(self):
         if self.s3_client is None:
-            self.s3_client = boto3.client('s3', config=Config(signature_version=UNSIGNED))
+            self.s3_client = boto3.client(
+                "s3", config=Config(signature_version=UNSIGNED)
+            )
         if self.s3_bucket is None:
             return
         # First download a copy of bathymetry.tml and call it bathymetry_s3.tml
@@ -90,12 +93,16 @@ class TideModelDatabase:
         filename = os.path.join(self.path, "tide_models_s3.tml")
         print("Updating tide models database ...")
         try:
-            self.s3_client.download_file(Bucket=self.s3_bucket,     # assign bucket name
-                                         Key=key,           # key is the file name
-                                         Filename=filename) # storage file path
-        except:
+            self.s3_client.download_file(
+                Bucket=self.s3_bucket,  # assign bucket name
+                Key=key,  # key is the file name
+                Filename=filename,
+            )  # storage file path
+        except Exception:
             # Download failed
-            print(f"Failed to download {key} from {self.s3_bucket}. Database will not be updated.")
+            print(
+                f"Failed to download {key} from {self.s3_bucket}. Database will not be updated."
+            )
             return
 
         # Read bathymetry_s3.tml
@@ -119,14 +126,16 @@ class TideModelDatabase:
                 filename = os.path.join(path, "metadata.tml")
                 # Download metadata
                 try:
-                    self.s3_client.download_file(Bucket=self.s3_bucket, # assign bucket name
-                                                Key=key,               # key is the file name
-                                                Filename=filename)     # storage file path
+                    self.s3_client.download_file(
+                        Bucket=self.s3_bucket,  # assign bucket name
+                        Key=key,  # key is the file name
+                        Filename=filename,
+                    )  # storage file path
                 except Exception as e:
                     print(e)
                     print(f"Failed to download {key}. Skipping tide model.")
                     continue
-                # Necessary data has been downloaded    
+                # Necessary data has been downloaded
                 tide_models_added = True
                 added_names.append(s3_name)
         # Write new local bathymetry.tml
@@ -139,7 +148,7 @@ class TideModelDatabase:
                 d["dataset"].append({"name": name})
             # Now write the new bathymetry.tml
             with open(os.path.join(self.path, "tide_models.tml"), "w") as tml:
-                toml.dump(d, tml)            
+                toml.dump(d, tml)
             # Read the database again
             self.dataset = []
             self.read()
@@ -162,8 +171,8 @@ class TideModelDatabase:
 
 
 # def dict2yaml(file_name, dct, sort_keys=False):
-#     yaml_string = yaml.dump(dct, sort_keys=sort_keys)    
-#     file = open(file_name, "w")  
+#     yaml_string = yaml.dump(dct, sort_keys=sort_keys)
+#     file = open(file_name, "w")
 #     file.write(yaml_string)
 #     file.close()
 

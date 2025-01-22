@@ -211,8 +211,9 @@ class Tide(object):
             # We search for stationary points from offset hours before t0 to
             # ensure we find any which might occur very soon after t0.
             offset = 24.0
-            partitions = (Tide._times(t0, i * partition) for i in count()), (
-                Tide._times(t0, i * partition) for i in count(1)
+            partitions = (
+                (Tide._times(t0, i * partition) for i in count()),
+                (Tide._times(t0, i * partition) for i in count(1)),
             )
 
             # We'll overestimate to be on the safe side;
@@ -245,8 +246,9 @@ class Tide(object):
 
                 # We'll overestimate to be on the safe side;
                 # values outside (start,end) won't get yielded.
-                intervals = (delta * i - offset for i in range(interval_count)), (
-                    delta * (i + 1) - offset for i in range(interval_count)
+                intervals = (
+                    (delta * i - offset for i in range(interval_count)),
+                    (delta * (i + 1) - offset for i in range(interval_count)),
                 )
                 for a, b in zip(*intervals):
                     if d(a) * d(b) < 0:

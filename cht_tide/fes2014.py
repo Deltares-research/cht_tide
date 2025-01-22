@@ -4,24 +4,26 @@ Created on Sun Apr 25 10:58:08 2021
 
 @author: Maarten van Ormondt
 """
+
 import os
+
 import xarray as xr
 
-from .model import TideModel
+from cht_tide.model import TideModel
+
 
 class TideModelFes2014(TideModel):
-    """
-    """
+    """ """
 
     def __init__(self, name, path):
         super().__init__()
-        
-        self.name              = name
-        self.path              = path
+
+        self.name = name
+        self.path = path
         # self.local_path        = path
         self.read_metadata()
         self.get_constituents()
-    
+
     def get_constituents(self):
         """
         Get constituents from nc file names in path
@@ -36,8 +38,7 @@ class TideModelFes2014(TideModel):
                 self.constituents.append(filename.split(".")[0].upper())
 
     def get_data(self, xl, yl, constituents="all"):
-        """
-        """
+        """ """
         if constituents == "all":
             constituents = self.constituents
 
@@ -51,7 +52,9 @@ class TideModelFes2014(TideModel):
 
         # Get dimensions from first file
         filename = os.path.join(self.path, f"{constituents[0]}.nc")
-        ds0 = xr.open_dataset(filename).sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
+        ds0 = xr.open_dataset(filename).sel(
+            lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1])
+        )
         lon = ds0.lon
         lat = ds0.lat
         ds0.close()
@@ -61,8 +64,14 @@ class TideModelFes2014(TideModel):
         ds["lon"] = lon
         ds["lat"] = lat
         # Set amplitude and phase arrays
-        ds["amplitude"] = xr.DataArray(data=nconst*[len(lat)*[len(lon)*[0.0]]], dims=["constituent", "lat", "lon"])
-        ds["phase"] = xr.DataArray(data=nconst*[len(lat)*[len(lon)*[0.0]]], dims=["constituent", "lat", "lon"])
+        ds["amplitude"] = xr.DataArray(
+            data=nconst * [len(lat) * [len(lon) * [0.0]]],
+            dims=["constituent", "lat", "lon"],
+        )
+        ds["phase"] = xr.DataArray(
+            data=nconst * [len(lat) * [len(lon) * [0.0]]],
+            dims=["constituent", "lat", "lon"],
+        )
 
         ds0.close()
 
@@ -70,11 +79,14 @@ class TideModelFes2014(TideModel):
         for constituent in constituents:
             # Get data for constituent
             filename = os.path.join(self.path, f"{constituent}.nc")
-            ds0 = xr.open_dataset(filename).sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
+            ds0 = xr.open_dataset(filename).sel(
+                lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1])
+            )
             # Add data to xarray dataset
-            ds["amplitude"].loc[constituent] = ds0["amplitude"].values / 100.0 # Convert cm to m
-            ds["phase"].loc[constituent] = ds0["phase"].values
+            ds["amplitude"].loc[constituent] = (
+                ds0["amplitude"].to_numpy() / 100.0
+            )  # Convert cm to m
+            ds["phase"].loc[constituent] = ds0["phase"].to_numpy()
             ds0.close()
-        
-        return ds
 
+        return ds
