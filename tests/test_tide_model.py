@@ -10,7 +10,7 @@ def test_tide_model():
     name = "fes2014"
     path = r"c:\work\delftdashboard\data\tidemodels\fes2014"
     mdl = TideModelFes2014(name, path)
-    ds = mdl.get_data([350.0, 351.0], [50.0, 51.0], constituents=["m2"])
+    _ds = mdl.get_data([350.0, 351.0], [50.0, 51.0], constituents=["m2"])
 
     x = [350.0, 351.0, 352.0]
     y = [50.0, 51.0, 52.0]

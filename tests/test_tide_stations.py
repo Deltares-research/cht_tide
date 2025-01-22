@@ -11,11 +11,11 @@ def test_tide_stations():
 
     dataset = database.dataset["xtide_free"]
     dataset.read_data()
-    gdf = dataset.gdf()
+    _gdf = dataset.gdf()
 
     station_name = dataset.station[0]["name"]
 
-    prd2 = dataset.predict(
+    _prd2 = dataset.predict(
         name=station_name, start="2023-01-01", end="2023-01-02", dt=300, format="df"
     )
 
