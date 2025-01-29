@@ -25,7 +25,7 @@ class SfincsBoundary:
         )
 
         # Loop through points
-        for ind in range(len(df.x.values)):
+        for ind in range(len(df.x.to_numpy())):
             name = str(ind + 1).zfill(4)
             point = FlowBoundaryPoint(
                 df.x.to_numpy()[ind], df.y.to_numpy()[ind], name=name
@@ -173,7 +173,7 @@ class IniStruct:
                     for item in a_list:
                         try:
                             list_of_floats.append(float(item))
-                        except:  # noqa: E722
+                        except Exception:  # noqa: E722
                             list_of_floats.append(item)
                     a_series = pd.Series(list_of_floats)
                     df = pd.concat([df, a_series], axis=1)

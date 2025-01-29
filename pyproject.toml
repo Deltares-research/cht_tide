@@ -17,11 +17,11 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Hydrology",
 ]
 requires-python = ">=3.10"
-dependencies = ["numpy", "scipy", "toml"]
+dependencies = ["numpy", "scipy", "toml","pandas", "geopandas", "boto3", "cht_utils"]
 dynamic = ["version"]
 
 [project.optional-dependencies]
-tests = ["pytest","pandas"]
+tests = ["pytest", "matplotlib"]
 
 [tool.setuptools]
 zip-safe = true

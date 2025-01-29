@@ -4,7 +4,9 @@ Created on Wed May 19 14:25:56 2021
 
 @author: ormondt
 """
+
 import pandas as pd
+
 import cht_tide.constituent as cons
 from cht_tide.tide import Tide
 
@@ -12,8 +14,8 @@ from cht_tide.tide import Tide
 def predict(data, times, format="np"):
     all_constituents = [c for c in cons.noaa if c != cons._Z0]
     constituents = []
-    amplitudes   = []
-    phases       = []
+    amplitudes = []
+    phases = []
     for name in data.index.to_list():
         okay = False
         noaa_name = name
@@ -42,11 +44,13 @@ def predict(data, times, format="np"):
                     phases.append(data.loc[name, "phase"])
                 else:
                     # Assume it is the second non-index column
-                    phases.append(data.loc[name, 2])    
-                okay = True                
+                    phases.append(data.loc[name, 2])
+                okay = True
                 continue
-        if not okay:    
-            print(f"Constituent {name} not found in list of NOAA constituents ! Skipping ...")    
+        if not okay:
+            print(
+                f"Constituent {name} not found in list of NOAA constituents ! Skipping ..."
+            )
 
     td = Tide(
         constituents=constituents,
