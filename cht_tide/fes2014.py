@@ -79,9 +79,9 @@ class TideModelFes2014(TideModel):
             # Get data for constituent
             filename = os.path.join(self.path, f"{constituent}.nc")
             with xr.open_dataset(filename) as data:
-                ds = data.sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
+                dsc = data.sel(lon=slice(xl[0], xl[1]), lat=slice(yl[0], yl[1]))
                 # Add data to xarray dataset
-                ds["amplitude"].loc[constituent] = ds0["amplitude"].to_numpy() / 100.0
-                ds["phase"].loc[constituent] = ds0["phase"].to_numpy()
+                ds["amplitude"].loc[constituent] = dsc["amplitude"].to_numpy() / 100.0
+                ds["phase"].loc[constituent] = dsc["phase"].to_numpy()
 
         return ds
