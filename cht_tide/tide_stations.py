@@ -27,6 +27,10 @@ class TideStationsDataset:
         self.path = path
         self.gdf = gpd.GeoDataFrame()
         self.is_read = False
+        self.file = None
+        self.s3_bucket = None
+        self.s3_key = None
+        self.s3_region = None
         self.read_metadata()
 
     def read_metadata(self):
@@ -42,12 +46,42 @@ class TideStationsDataset:
         elif "long_name" in metadata:
             self.long_name = metadata["long_name"]
         self.file = metadata["file"]
+        if "s3_bucket" in metadata:
+            self.s3_bucket = metadata["s3_bucket"]
+        if "s3_key" in metadata:
+            self.s3_key = metadata["s3_key"]
+        if "s3_region" in metadata:
+            self.s3_region = metadata["s3_region"]    
+
+    def check_file(self):
+        okay = True
+        if self.file is not None:
+            if not os.path.exists(os.path.join(self.path, self.file)):
+                okay = False
+        return okay        
+
+    def download(self):
+        if self.s3_bucket is None:
+            return
+        # Check if download is needed
+        if not self.check_file():
+            print(f"Downloading {self.file} for tide stations set {self.name} ...")
+            s3_client = boto3.client(
+                "s3", config=Config(signature_version=UNSIGNED)
+            )
+            s3_client.download_file(
+                self.s3_bucket,
+                f"{self.s3_key}/{self.file}",
+                os.path.join(self.path, self.file),
+            )
 
     def read_data(self):
         """Reads the netcdf file and store it in self.data"""
         if self.is_read:
             return
         filename = os.path.join(self.path, self.file)
+        if not self.check_file():
+            self.download()
         if not os.path.exists(filename):
             print("Warning! Tide stations dataset file not found: " + filename)
             return
