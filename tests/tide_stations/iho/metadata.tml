@@ -1,0 +1,6 @@
+longname = "IHO"
+format = "netcdf"
+file = "iho.nc"
+s3_bucket = "deltares-ddb"
+s3_key = "data/tide_stations/iho"
+s3_region = "eu-west-1"

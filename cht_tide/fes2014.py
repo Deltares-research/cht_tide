@@ -42,6 +42,9 @@ class TideModelFes2014(TideModel):
         if constituents == "all":
             constituents = self.constituents
 
+        if len(constituents) == 0:
+            self.get_constituents()    
+
         nconst = len(constituents)
 
         if xl[0] < 0.0 and xl[1] < 0.0:

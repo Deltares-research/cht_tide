@@ -1,0 +1,6 @@
+longname = "XTide free"
+format = "netcdf"
+file = "xtide_free.nc"
+s3_bucket = "deltares-ddb"
+s3_key = "data/tide_stations/xtide_free"
+s3_region = "eu-west-1"
