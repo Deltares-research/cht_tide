@@ -411,7 +411,7 @@ def df2tekaltimeseries(df, filename):
         f.write("* column 2 : Time\n")
         f.write("* column 3 : WL\n")
         f.write("BL01\n")
-        f.write(f"{nt} 4\n")
+        f.write(f"{nt} 3\n")
         j = 0
         for i, row in df.iterrows():
             # date, time and first column of data
