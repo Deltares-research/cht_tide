@@ -128,7 +128,7 @@ class TideModel:
                 df["phase"] = dsp.phase.to_numpy()
                 df = df.set_index("constituent")
                 # Set "astro" column in row i to df
-                gdf.at[i, "astro"] = df
+                gdf.at[i, "astro"] = df  # noqa: PD008
             return gdf
         elif format == "dataframe" or format == "df" or format == "pandas":
             # Return list with dataframes
