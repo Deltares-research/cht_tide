@@ -43,7 +43,7 @@ class TideModelFes2014(TideModel):
             constituents = self.constituents
 
         if len(constituents) == 0:
-            self.get_constituents()    
+            self.get_constituents()
 
         nconst = len(constituents)
 
