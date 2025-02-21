@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 from geopandas import GeoDataFrame
 from shapely.geometry import Point
 
@@ -6,6 +7,7 @@ from cht_tide.fes2014 import TideModelFes2014
 from cht_tide.tide_predict import predict
 
 
+@pytest.mark.skip(reason="TODO resolve absolute filepaths to data")
 def test_tide_model():
     name = "fes2014"
     path = r"c:\work\delftdashboard\data\tidemodels\fes2014"
