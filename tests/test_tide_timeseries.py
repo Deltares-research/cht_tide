@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from cht_tide.read_bca import SfincsBoundary
@@ -75,9 +76,13 @@ def test_timeseries_from_components():
     assert v.dtype == "float64"
     assert len(times) == len(v)
 
+    range = np.max(v) - np.min(v)
+    assert np.diff(v).max() < range / 10  # Check that the values smoothly change
+
 
 def test_read_bca_file():
-    test_folder = Path().absolute() / "tests"
+    test_folder = Path(__file__).parent
+
     bca_file = test_folder.joinpath("sfincs.bca")
     bnd_file = test_folder.joinpath("sfincs.bnd")
 
@@ -90,7 +95,7 @@ def test_read_bca_file():
 
 
 def test_read_bca_and_predict_timeseries():
-    test_folder = Path().absolute() / "tests"
+    test_folder = Path(__file__).parent
     bca_file = test_folder.joinpath("sfincs.bca")
     bnd_file = test_folder.joinpath("sfincs.bnd")
 
@@ -105,3 +110,6 @@ def test_read_bca_and_predict_timeseries():
 
     assert v.dtype == "float64"
     assert len(times) == len(v)
+
+    range = np.max(v) - np.min(v)
+    assert np.diff(v).max() < range / 10  # Check that the values smoothly change
