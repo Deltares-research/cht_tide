@@ -51,14 +51,14 @@ class TideStationsDataset:
         if "s3_key" in metadata:
             self.s3_key = metadata["s3_key"]
         if "s3_region" in metadata:
-            self.s3_region = metadata["s3_region"]    
+            self.s3_region = metadata["s3_region"]
 
     def check_file(self):
         okay = True
         if self.file is not None:
             if not os.path.exists(os.path.join(self.path, self.file)):
                 okay = False
-        return okay        
+        return okay
 
     def download(self):
         if self.s3_bucket is None:
@@ -66,9 +66,7 @@ class TideStationsDataset:
         # Check if download is needed
         if not self.check_file():
             print(f"Downloading {self.file} for tide stations set {self.name} ...")
-            s3_client = boto3.client(
-                "s3", config=Config(signature_version=UNSIGNED)
-            )
+            s3_client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
             s3_client.download_file(
                 self.s3_bucket,
                 f"{self.s3_key}/{self.file}",
@@ -244,7 +242,9 @@ class TideStationsDatabase:
     :type pth: string
     """
 
-    def __init__(self, path=None, s3_bucket=None, s3_key=None, s3_region=None, check_online=False):
+    def __init__(
+        self, path=None, s3_bucket=None, s3_key=None, s3_region=None, check_online=False
+    ):
         self.path = path
         self.dataset = {}
         self.s3_client = None
