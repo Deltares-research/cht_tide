@@ -43,6 +43,7 @@ class TideModelFes2014(TideModel):
             constituents = self.constituents
 
         if len(constituents) == 0:
+            # File were probably just downloaded from S3, so get the constituents
             self.get_constituents()
 
         nconst = len(constituents)
