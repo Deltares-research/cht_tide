@@ -35,7 +35,9 @@ include = ["cht_tide"]
 [tool.setuptools.package-data]
 "cht_observations" = ["py.typed"]
 
-# TODO
 [project.urls]
 Source = "https://github.com/Deltares/cht_tide"
-#Documentation = "https://deltares.github.io/CoastalHazardTools"
+
+[tool.pytest.ini_options]
+addopts = "--cov cht_tide --cov-report xml"
+testpaths = ["tests"]
