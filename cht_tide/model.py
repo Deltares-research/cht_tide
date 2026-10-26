@@ -135,6 +135,13 @@ class TideModel:
         # Download files if needed
         self.download()
 
+        # The constituent list is built from the files on disk when the model
+        # is loaded; refresh it if the files were only just downloaded.
+        if not getattr(self, "constituents", None) and hasattr(
+            self, "get_constituents"
+        ):
+            self.get_constituents()
+
         if constituents == "all":
             constituents = self.constituents
         elif constituents == "main":
