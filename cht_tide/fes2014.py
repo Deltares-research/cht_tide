@@ -69,12 +69,13 @@ class TideModelFes2014(TideModel):
             # Files were probably just downloaded from S3, so get the constituents
             self.get_constituents()
             constituents = self.constituents
-            
+
         if len(constituents) == 0:
             raise FileNotFoundError(
                 f"No constituent files (*.nc) found in {self.path} for tide model "
                 f"{self.name}."
             )
+
         nconst = len(constituents)
 
         if xl[0] < 0.0 and xl[1] < 0.0:
