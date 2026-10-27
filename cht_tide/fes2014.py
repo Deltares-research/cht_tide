@@ -62,12 +62,19 @@ class TideModelFes2014(TideModel):
             Dataset with dimensions ``constituent``, ``lat``, ``lon`` and
             variables ``amplitude`` (metres) and ``phase`` (degrees).
         """
-        if constituents == "all":
+        if isinstance(constituents, str) and constituents == "all":
             constituents = self.constituents
 
         if len(constituents) == 0:
             # Files were probably just downloaded from S3, so get the constituents
             self.get_constituents()
+            constituents = self.constituents
+
+        if len(constituents) == 0:
+            raise FileNotFoundError(
+                f"No constituent files (*.nc) found in {self.path} for tide model "
+                f"{self.name}."
+            )
 
         nconst = len(constituents)
 

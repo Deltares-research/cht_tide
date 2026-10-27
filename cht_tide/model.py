@@ -135,59 +135,60 @@ class TideModel:
         # Download files if needed
         self.download()
 
+        # The constituent list is built from the files on disk when the model
+        # is loaded; refresh it if the files were only just downloaded.
+        if not getattr(self, "constituents", None) and hasattr(
+            self, "get_constituents"
+        ):
+            self.get_constituents()
+
         if constituents == "all":
             constituents = self.constituents
         elif constituents == "main":
             constituents = self.main_constituents
 
-        if gdf is not None:
-            gdf4326 = gdf.to_crs("EPSG:4326")
-            xl = [gdf4326.geometry.x.min(), gdf4326.geometry.x.max()]
-            yl = [gdf4326.geometry.y.min(), gdf4326.geometry.y.max()]
-            xl[0] -= 0.25
-            xl[1] += 0.25
-            yl[0] -= 0.25
-            yl[1] += 0.25
-        else:
+        if gdf is None:
             gdf = pd.DataFrame()
             gdf["geometry"] = [Point(x, y) for x, y in zip(x, y)]
             gdf = gpd.GeoDataFrame(gdf, crs=crs)
 
+        gdf4326 = gdf.to_crs("EPSG:4326")
+        xl = [gdf4326.geometry.x.min(), gdf4326.geometry.x.max()]
+        yl = [gdf4326.geometry.y.min(), gdf4326.geometry.y.max()]
+        xl[0] -= 0.25
+        xl[1] += 0.25
+        yl[0] -= 0.25
+        yl[1] += 0.25
+
         ds = self.get_data(xl, yl, constituents=constituents)
+
+        # Interpolate the vector components, so that phases are not averaged
+        # across the 0/360 degree jump
+        ds["tvu"] = ds.amplitude * np.cos(ds.phase * np.pi / 180.0)
+        ds["tvv"] = ds.amplitude * np.sin(ds.phase * np.pi / 180.0)
+
+        # One DataFrame (indexed by constituent) per point
+        dfs = []
+        for _, row in gdf4326.iterrows():
+            x = np.mod(row.geometry.x, 360.0)
+            y = row.geometry.y
+            dsp = ds.interp(lon=x, lat=y)
+            df = pd.DataFrame()
+            df["constituent"] = constituents
+            df["amplitude"] = np.sqrt(dsp.tvu**2 + dsp.tvv**2).to_numpy()
+            df["phase"] = np.mod(
+                np.arctan2(dsp.tvv, dsp.tvu) * 180.0 / np.pi, 360.0
+            ).to_numpy()
+            dfs.append(df.set_index("constituent"))
 
         if format == "gdf" or format == "geodataframe":
             if "astro" not in gdf.columns:
                 gdf["astro"] = None
-            for i, row in gdf.to_crs("EPSG:4326").iterrows():
-                x = np.mod(row.geometry.x, 360.0)
-                y = row.geometry.y
-                ds["tvu"] = ds.amplitude * np.cos(ds.phase * np.pi / 180.0)
-                ds["tvv"] = ds.amplitude * np.sin(ds.phase * np.pi / 180.0)
-                dsp = ds.interp(lon=x, lat=y)
-                df = pd.DataFrame()
-                df["constituent"] = constituents
-                dsp["amplitude"] = np.sqrt(dsp.tvu**2 + dsp.tvv**2)
-                dsp["phase"] = np.mod(
-                    np.arctan2(dsp.tvv, dsp.tvu) * 180.0 / np.pi, 360.0
-                )
-                df["amplitude"] = dsp.amplitude.to_numpy()
-                df["phase"] = dsp.phase.to_numpy()
-                df = df.set_index("constituent")
+            for i, df in zip(gdf.index, dfs):
                 gdf.at[i, "astro"] = df  # noqa: PD008
             return gdf
         elif format == "dataframe" or format == "df" or format == "pandas":
-            lst = []
-            for i, row in gdf.to_crs("EPSG:4326").iterrows():
-                dsp = ds.interp(
-                    lon=np.array(row.geometry.x), lat=np.array(row.geometry.y)
-                )
-                df = pd.DataFrame()
-                df["constituent"] = constituents
-                df["amplitude"] = dsp.amplitude.to_numpy()
-                df["phase"] = dsp.phase.to_numpy()
-                df.set_index("constituent")
-                lst.append(df)
-            return lst
+            return dfs
 
     def add_offset(self, data, offset: float = 0):
         """Add a constant vertical offset (datum correction) to tidal data.
