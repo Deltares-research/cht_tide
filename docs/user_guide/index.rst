@@ -4,21 +4,17 @@ User guide
 Harmonic analysis
 -----------------
 
-The :class:`~cht_tide.tide.Tide` class performs classical harmonic analysis on a
-water level time series. It decomposes the signal into a set of tidal
-constituents, each described by an amplitude and a phase.
+The :class:`~cht_tide.tide.Tide` class performs harmonic analysis on a water
+level time series, fitting amplitudes and phases for tidal constituents.
 
 .. code-block:: python
 
    from cht_tide.tide import Tide
 
-   t = Tide(times=time_array, values=wl_array)
-   t.analyse()
+   fit = Tide.decompose(heights=wl_array, t=time_array)
 
-   # Access results
-   t.constituent_names   # list of str
-   t.amplitudes          # 1-D array (metres)
-   t.phases              # 1-D array (degrees)
+   # Fitted constituents, amplitudes (metres), and phases (degrees)
+   fit.model
 
 The analysis uses a least-squares fit with nodal corrections computed from the
 :mod:`cht_tide.nodal_corrections` and :mod:`cht_tide.astro` modules.
@@ -27,51 +23,50 @@ Tidal prediction
 ----------------
 
 :func:`~cht_tide.tide_predict.predict` synthesises a water level time series
-from known constituent amplitudes and phases:
+from constituent data in a pandas DataFrame indexed by constituent name, with
+``amplitude`` in metres and ``phase`` in degrees:
 
 .. code-block:: python
 
    from cht_tide.tide_predict import predict
 
-   wl = predict(times, constituent_names, amplitudes, phases)
+   wl = predict(constituents, times)
 
-Both ``times`` and the output are NumPy arrays. The function applies the
-correct astronomical arguments and nodal corrections automatically.
+The output is a NumPy array in the same order as ``times``. The function
+applies astronomical arguments and nodal corrections automatically.
 
 Global tide models
 ------------------
 
 :class:`~cht_tide.model.TideModel` provides access to gridded global tide
-models (currently FES2014). It can interpolate constituent amplitudes and
-phases onto arbitrary geographic coordinates:
-
-.. code-block:: python
-
-   from cht_tide.model import TideModel
-
-   model = TideModel(path="/data/tide_models/fes2014")
-
-   # Get amplitudes and phases at a list of points
-   amps, phases = model.get_constituents(lon=[4.0, 5.0], lat=[52.0, 53.0])
-
-The :class:`~cht_tide.database.TideModelDatabase` manages a collection of
-tide models (local and remote via S3) and provides a higher-level interface:
+models (currently FES2014). Use :class:`~cht_tide.database.TideModelDatabase`
+to retrieve a model and interpolate constituent amplitudes and phases at
+geographic coordinates:
 
 .. code-block:: python
 
    from cht_tide.database import TideModelDatabase
 
    db = TideModelDatabase(path="/data/tide_models")
-   db.read()
+   model = db.get_dataset("fes2014_extrap")
+   point_data = model.get_data_on_points(
+       x=[4.0, 5.0],
+       y=[52.0, 53.0],
+       crs="EPSG:4326",
+       format="dataframe",
+       constituents="main",
+   )
 
-   # List available models
-   print(db.dataset_names)
+``point_data`` is a list of DataFrames, one for each point. The database also
+provides ``db.dataset_names()`` to list the available models. Model files must
+be available locally or configured for download from an S3 source; they are
+distributed separately from the Python package.
 
 Tide station databases
 ----------------------
 
 :class:`~cht_tide.tide_stations.TideStationsDatabase` manages collections of
-tide station datasets that contain harmonic constituent information at discrete
+tide station datasets containing harmonic constituent information at discrete
 station locations:
 
 .. code-block:: python
@@ -79,10 +74,13 @@ station locations:
    from cht_tide.tide_stations import TideStationsDatabase
 
    db = TideStationsDatabase(path="/data/tide_stations")
-   db.read()
+   dataset = db.dataset["xtide_free"]
 
-   # Get a GeoDataFrame of all stations in a dataset
-   gdf = db.datasets["xtide"].gdf
+   stations = dataset.get_gdf()
+   station_name = stations.iloc[0]["name"]
+   constituents = dataset.get_components(name=station_name)
 
-   # Get constituents at a specific station
-   station = db.datasets["xtide"].get_station(name="Sewells Point")
+``get_gdf`` returns station locations as a GeoDataFrame, and
+``get_components`` returns a DataFrame of amplitudes and phases for the
+selected station. Station datasets are distributed separately from the
+Python package.
