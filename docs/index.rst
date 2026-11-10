@@ -22,4 +22,5 @@ Key capabilities:
    getting_started
    user_guide/index
    api/index
+   releasing
    changelog

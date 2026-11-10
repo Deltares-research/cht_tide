@@ -15,6 +15,7 @@ Added
 - Support configurable S3-compatible endpoints for tide model and station databases.
 - Support constant vertical datum offsets for gridded tide-model constituent data.
 - Add Sphinx user and API documentation.
+- Document the maintainer release procedure.
 - Declare ``botocore``, ``pyproj``, ``shapely``, and ``xarray`` as direct runtime
   dependencies; the existing runtime dependencies remain in place.
 
