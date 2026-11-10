@@ -23,7 +23,10 @@ dependencies = ["numpy",
 	"pandas",
 	"geopandas",
 	"boto3",
-	"cht_utils@ git+https://github.com/deltares-research/cht_utils.git"
+	"botocore",
+	"pyproj",
+	"shapely",
+	"xarray",
 ]
 
 dynamic = ["version"]

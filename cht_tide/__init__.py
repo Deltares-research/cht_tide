@@ -4,7 +4,7 @@ Exposes the main public API: database access, model classes, prediction,
 and tide station lookups.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from cht_tide.database import TideModelDatabase
 from cht_tide.model import TideModel
