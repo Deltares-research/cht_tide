@@ -160,7 +160,11 @@ class TideModel:
         yl[0] -= 0.25
         yl[1] += 0.25
 
-        ds = self.get_data(xl, yl, constituents=constituents)
+        # The longitudes of the box are continuous, also across the 0 meridian
+        from cht_tide.export import read_box
+
+        ds = read_box(self, xl, yl, constituents=constituents)
+        lon0 = float(ds.lon.values[0])
 
         # Interpolate the vector components, so that phases are not averaged
         # across the 0/360 degree jump
@@ -170,7 +174,7 @@ class TideModel:
         # One DataFrame (indexed by constituent) per point
         dfs = []
         for _, row in gdf4326.iterrows():
-            x = np.mod(row.geometry.x, 360.0)
+            x = np.mod(row.geometry.x - lon0, 360.0) + lon0
             y = row.geometry.y
             dsp = ds.interp(lon=x, lat=y)
             df = pd.DataFrame()
