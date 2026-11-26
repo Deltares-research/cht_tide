@@ -13,10 +13,19 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import toml
+import xarray as xr
 from botocore import UNSIGNED
 from botocore.client import Config
 from pyproj import CRS
 from shapely.geometry import Point
+
+# Quantities a tide model can provide: water level (m), eastward and northward
+# depth-averaged velocity (m/s)
+QUANTITIES = {
+    "z": "water level",
+    "u": "eastward velocity",
+    "v": "northward velocity",
+}
 
 
 class TideModel:
@@ -39,6 +48,9 @@ class TideModel:
         Names of the eight principal tidal constituents.
     files : list of str
         File names that must exist locally (used for S3 download checks).
+    has_currents : bool
+        True if the dataset also provides tidal currents (quantities ``"u"``
+        and ``"v"``).
     """
 
     def __init__(self) -> None:
@@ -48,6 +60,14 @@ class TideModel:
         self.path = ""
         self.main_constituents = ["M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1"]
         self.files = []
+        self.has_currents = False
+
+    def quantity_folder(self, quantity: str = "z") -> str:
+        """Sub folder (relative to ``self.path``) holding the files of *quantity*.
+
+        The base implementation keeps all files in ``self.path``.
+        """
+        return ""
 
     def read_metadata(self) -> None:
         """Read dataset metadata from ``metadata.tml`` in ``self.path``.
@@ -69,32 +89,39 @@ class TideModel:
 
         self.crs = CRS(4326)
 
-    def download(self) -> None:
-        """Download any missing dataset files from S3.
+    def download(self, quantity: str = "z") -> None:
+        """Download any missing dataset files of *quantity* from S3.
 
         Does nothing if ``self.s3_bucket`` is ``None`` or all files are
-        already present locally.
+        already present locally. The files of a quantity are ``self.files`` in
+        :meth:`quantity_folder` (locally and in the bucket).
+
+        Parameters
+        ----------
+        quantity : str, optional
+            ``"z"`` (water level, default), ``"u"`` or ``"v"`` (currents).
         """
-        if self.s3_bucket is None:
+        if getattr(self, "s3_bucket", None) is None:
             return
-        # Check if download is needed
-        for file in self.files:
-            if not os.path.exists(os.path.join(self.path, file)):
-                s3_client = boto3.client(
-                    "s3",
-                    endpoint_url=getattr(self, "s3_endpoint", None) or None,
-                    config=Config(signature_version=UNSIGNED),
-                )
-                break
-        # Get all files defined in the toml file
-        for file in self.files:
-            if not os.path.exists(os.path.join(self.path, file)):
-                print(f"Downloading {file} from tide model {self.name} ...")
-                s3_client.download_file(
-                    self.s3_bucket,
-                    f"{self.s3_key}/{file}",
-                    os.path.join(self.path, file),
-                )
+        folder = self.quantity_folder(quantity)
+        local_files = [
+            (file, os.path.join(self.path, folder, file)) for file in self.files
+        ]
+        missing = [(f, p) for f, p in local_files if not os.path.exists(p)]
+        if not missing:
+            return
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=getattr(self, "s3_endpoint", None) or None,
+            config=Config(signature_version=UNSIGNED),
+        )
+        os.makedirs(os.path.join(self.path, folder), exist_ok=True)
+        key_prefix = f"{self.s3_key}/{folder}/" if folder else f"{self.s3_key}/"
+        for file, local_path in missing:
+            print(
+                f"Downloading {folder + '/' if folder else ''}{file} from tide model {self.name} ..."
+            )
+            s3_client.download_file(self.s3_bucket, key_prefix + file, local_path)
 
     def get_data_on_points(
         self,
@@ -104,6 +131,7 @@ class TideModel:
         crs=None,
         format: str = "gdf",
         constituents="all",
+        quantity: str = "z",
     ):
         """Interpolate tidal constituents onto a set of geographic points.
 
@@ -124,6 +152,10 @@ class TideModel:
             ``"dataframe"`` / ``"df"`` / ``"pandas"``.
         constituents : str or list of str, optional
             Which constituents to extract (``"all"`` or ``"main"``).
+        quantity : str, optional
+            ``"z"`` (water level in m, default), ``"u"`` (eastward velocity in
+            m/s) or ``"v"`` (northward velocity in m/s). Predicting with the
+            constituents of ``"u"`` and ``"v"`` gives the velocity components.
 
         Returns
         -------
@@ -132,8 +164,15 @@ class TideModel:
             ``"astro"`` column containing per-station DataFrames.
             When *format* is ``"dataframe"``, a list of DataFrames.
         """
+        if quantity not in QUANTITIES:
+            raise ValueError(
+                f"Unknown quantity '{quantity}'; use one of {list(QUANTITIES)}"
+            )
+        if quantity != "z" and not self.has_currents:
+            raise ValueError(f"Tide model {self.name} has no tidal currents.")
+
         # Download files if needed
-        self.download()
+        self.download(quantity)
 
         # The constituent list is built from the files on disk when the model
         # is loaded; refresh it if the files were only just downloaded.
@@ -163,7 +202,7 @@ class TideModel:
         # The longitudes of the box are continuous, also across the 0 meridian
         from cht_tide.export import read_box
 
-        ds = read_box(self, xl, yl, constituents=constituents)
+        ds = read_box(self, xl, yl, constituents=constituents, quantity=quantity)
         lon0 = float(ds.lon.values[0])
 
         # Interpolate the vector components, so that phases are not averaged
@@ -171,18 +210,24 @@ class TideModel:
         ds["tvu"] = ds.amplitude * np.cos(ds.phase * np.pi / 180.0)
         ds["tvv"] = ds.amplitude * np.sin(ds.phase * np.pi / 180.0)
 
+        # Interpolate all points at once (pointwise, along a "point" dimension)
+        xp = np.mod(gdf4326.geometry.x.to_numpy() - lon0, 360.0) + lon0
+        yp = gdf4326.geometry.y.to_numpy()
+        dsp = ds[["tvu", "tvv"]].interp(
+            lon=xr.DataArray(xp, dims="point"), lat=xr.DataArray(yp, dims="point")
+        )
+        tvu = dsp.tvu.transpose("point", "constituent").to_numpy()
+        tvv = dsp.tvv.transpose("point", "constituent").to_numpy()
+        amplitude = np.sqrt(tvu**2 + tvv**2)
+        phase = np.mod(np.arctan2(tvv, tvu) * 180.0 / np.pi, 360.0)
+
         # One DataFrame (indexed by constituent) per point
         dfs = []
-        for _, row in gdf4326.iterrows():
-            x = np.mod(row.geometry.x - lon0, 360.0) + lon0
-            y = row.geometry.y
-            dsp = ds.interp(lon=x, lat=y)
+        for ip in range(len(xp)):
             df = pd.DataFrame()
             df["constituent"] = constituents
-            df["amplitude"] = np.sqrt(dsp.tvu**2 + dsp.tvv**2).to_numpy()
-            df["phase"] = np.mod(
-                np.arctan2(dsp.tvv, dsp.tvu) * 180.0 / np.pi, 360.0
-            ).to_numpy()
+            df["amplitude"] = amplitude[ip]
+            df["phase"] = phase[ip]
             dfs.append(df.set_index("constituent"))
 
         if format == "gdf" or format == "geodataframe":

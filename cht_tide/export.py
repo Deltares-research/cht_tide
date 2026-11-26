@@ -21,7 +21,11 @@ PROJECTED_SPACING = 10000.0
 
 
 def read_box(
-    model: Any, xl: List[float], yl: List[float], constituents: Any = "all"
+    model: Any,
+    xl: List[float],
+    yl: List[float],
+    constituents: Any = "all",
+    quantity: str = "z",
 ) -> xr.Dataset:
     """Read amplitudes and phases of a tide model in a geographic box.
 
@@ -33,29 +37,39 @@ def read_box(
         Longitude and latitude limits.
     constituents : str or list of str, optional
         Constituents to read (``"all"`` by default).
+    quantity : str, optional
+        ``"z"`` (water level, default), ``"u"`` or ``"v"`` (eastward or
+        northward velocity).
 
     Returns
     -------
     xr.Dataset
-        ``amplitude`` (m) and ``phase`` (degrees) with dimensions ``constituent``,
-        ``lat``, ``lon``; the longitudes are continuous over the box, also when it crosses
-        the 0 meridian.
+        ``amplitude`` (m, or m/s for currents) and ``phase`` (degrees) with dimensions
+        ``constituent``, ``lat``, ``lon``; the longitudes are continuous over the box, also
+        when it crosses the 0 meridian.
     """
-    model.download()
+    if quantity == "z":
+        model.download()
+        kwargs = {}
+    else:
+        model.download(quantity)
+        kwargs = {"quantity": quantity}
     if not getattr(model, "constituents", None) and hasattr(model, "get_constituents"):
         model.get_constituents()
     x0, x1 = float(xl[0]), float(xl[1])
     shift = 360.0 * np.floor(x0 / 360.0)
     x0, x1 = x0 - shift, x1 - shift
-    if x1 <= 360.0:
-        ds = model.get_data([x0, x1], yl, constituents=constituents)
+    if x1 <= 360.0 or getattr(model, "reads_across_meridian", False):
+        # The model reads a box crossing its 360 meridian itself (FES2014), which
+        # opens every file once instead of twice
+        ds = model.get_data([x0, x1], yl, constituents=constituents, **kwargs)
     else:
         # The box crosses the 0 meridian of the model (longitudes 0 to 360)
         ds = xr.concat(
             [
-                model.get_data([x0, 360.0], yl, constituents=constituents),
+                model.get_data([x0, 360.0], yl, constituents=constituents, **kwargs),
                 model.get_data(
-                    [0.0, x1 - 360.0], yl, constituents=constituents
+                    [0.0, x1 - 360.0], yl, constituents=constituents, **kwargs
                 ).assign_coords(lon=lambda d: d.lon + 360.0),
             ],
             dim="lon",
@@ -71,6 +85,7 @@ def get_map(
     constituents: Any = "all",
     spacing: float = PROJECTED_SPACING,
     land_mask: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
+    quantity: str = "z",
 ) -> Tuple[np.ndarray, np.ndarray, List[str], np.ndarray, np.ndarray]:
     """Amplitude and phase maps of a tide model in a box.
 
@@ -79,7 +94,9 @@ def get_map(
     as FES2014 (extrapolated) has extrapolated onto land. See :func:`_get_map` for the other
     parameters.
     """
-    x, y, names, amplitude, phase = _get_map(model, xl, yl, crs, constituents, spacing)
+    x, y, names, amplitude, phase = _get_map(
+        model, xl, yl, crs, constituents, spacing, quantity
+    )
     if land_mask is not None:
         land = np.asarray(land_mask(x, y), dtype=bool)
         amplitude = np.where(land[None, :, :], np.nan, amplitude)
@@ -94,6 +111,7 @@ def _get_map(
     crs: Any = 4326,
     constituents: Any = "all",
     spacing: float = PROJECTED_SPACING,
+    quantity: str = "z",
 ) -> Tuple[np.ndarray, np.ndarray, List[str], np.ndarray, np.ndarray]:
     """Amplitude and phase maps of a tide model in a box.
 
@@ -109,6 +127,10 @@ def _get_map(
         Constituents (``"all"`` by default).
     spacing : float, optional
         Grid spacing (m) for a projected system.
+    quantity : str, optional
+        ``"z"`` (water level, default), ``"u"`` or ``"v"`` (eastward or northward
+        velocity). The velocity components stay east and north, also in a projected
+        system.
 
     Returns
     -------
@@ -129,7 +151,7 @@ def _get_map(
     """
     crs = CRS(crs)
     if crs.is_geographic:
-        ds = read_box(model, xl, yl, constituents)
+        ds = read_box(model, xl, yl, constituents, quantity)
         x, y = np.meshgrid(ds.lon.values, ds.lat.values)
         return (
             x,
@@ -147,6 +169,7 @@ def _get_map(
         [lon.min() - 1.0, lon.max() + 1.0],
         [lat.min() - 1.0, lat.max() + 1.0],
         constituents,
+        quantity,
     )
     x, y = np.meshgrid(
         np.arange(xl[0], xl[1] + 0.5 * spacing, spacing),
@@ -174,12 +197,20 @@ def write_netcdf_map(
     amplitude: np.ndarray,
     phase: np.ndarray,
     crs: Any = 4326,
+    quantity: str = "z",
 ) -> None:
     """Write amplitude and phase maps to a CF-compliant NetCDF file.
 
     Dimensions are ``constituent``, ``lat``, ``lon`` (or ``y``, ``x`` in a projected
     system); the coordinate reference system is given by the grid mapping variable ``crs``.
+    *quantity* (``"z"``, ``"u"`` or ``"v"``) sets the long names and units.
     """
+    description = {
+        "z": "water level",
+        "u": "eastward velocity",
+        "v": "northward velocity",
+    }[quantity]
+    units = "m" if quantity == "z" else "m s-1"
     crs = CRS(crs)
     if crs.is_geographic:
         xname, yname = "lon", "lat"
@@ -220,8 +251,8 @@ def write_netcdf_map(
                 dims,
                 amplitude.astype("float32"),
                 {
-                    "long_name": "tidal amplitude of the water level",
-                    "units": "m",
+                    "long_name": f"tidal amplitude of the {description}",
+                    "units": units,
                     "grid_mapping": "crs",
                 },
             ),
@@ -229,7 +260,7 @@ def write_netcdf_map(
                 dims,
                 phase.astype("float32"),
                 {
-                    "long_name": "tidal phase of the water level (relative to Greenwich)",
+                    "long_name": f"tidal phase of the {description} (relative to Greenwich)",
                     "units": "degrees",
                     "grid_mapping": "crs",
                 },
@@ -260,8 +291,9 @@ def export_map(
     yl: List[float],
     crs: Any = 4326,
     land_mask: Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None,
+    quantity: str = "z",
 ) -> None:
-    """Export the water-level amplitude and phase maps of all constituents in a box to NetCDF.
+    """Export the amplitude and phase maps of all constituents in a box to NetCDF.
 
     Parameters
     ----------
@@ -275,16 +307,18 @@ def export_map(
         Coordinate reference system of the box and of the exported grid.
     land_mask : callable, optional
         Returns True for land points (see :func:`get_map`).
+    quantity : str, optional
+        ``"z"`` (water level, default), ``"u"`` or ``"v"`` (eastward or northward
+        velocity; only for a model with ``has_currents``).
 
     Notes
     -----
-    Only water levels: unlike the MATLAB version (TPXO), the tide models of cht_tide
-    have no tidal currents. The MATLAB version wrote Tekal or mat files.
+    The MATLAB version wrote Tekal or mat files.
     """
     x, y, constituents, amplitude, phase = get_map(
-        model, xl, yl, crs, land_mask=land_mask
+        model, xl, yl, crs, land_mask=land_mask, quantity=quantity
     )
-    write_netcdf_map(filename, x, y, constituents, amplitude, phase, crs)
+    write_netcdf_map(filename, x, y, constituents, amplitude, phase, crs, quantity)
 
 
 def predict_at_point(
@@ -297,8 +331,9 @@ def predict_at_point(
     crs: Any = 4326,
     time_zone: float = 0.0,
     offset: float = 0.0,
+    quantity: str = "z",
 ) -> pd.Series:
-    """Predicted water level of a tide model at a point.
+    """Predicted water level (or tidal current component) of a tide model at a point.
 
     Parameters
     ----------
@@ -315,19 +350,27 @@ def predict_at_point(
     time_zone : float, optional
         Local time zone (hours ahead of UTC); the times of the series are local times.
     offset : float, optional
-        Vertical offset (m), added to the series.
+        Vertical offset (m), added to the series. Only for water levels.
+    quantity : str, optional
+        ``"z"`` (water level, default), ``"u"`` or ``"v"`` (eastward or northward
+        velocity).
 
     Returns
     -------
     pd.Series
-        Water level (m) indexed by local time.
+        Water level (m) or velocity component (m/s) indexed by local time, named
+        ``"WL"``, ``"U"`` or ``"V"``.
 
     Notes
     -----
     Fix: the MATLAB version ignored the time zone and the vertical offset.
     """
+    if quantity != "z" and offset != 0.0:
+        raise ValueError("A vertical offset only applies to water levels")
     lon, lat = Transformer.from_crs(CRS(crs), 4326, always_xy=True).transform(x, y)
-    ds = read_box(model, [lon - 1.0, lon + 1.0], [lat - 1.0, lat + 1.0])
+    ds = read_box(
+        model, [lon - 1.0, lon + 1.0], [lat - 1.0, lat + 1.0], quantity=quantity
+    )
     rad = np.pi / 180.0
     u = (ds.amplitude * np.cos(ds.phase * rad)).interp(lon=lon, lat=lat).values
     v = (ds.amplitude * np.sin(ds.phase * rad)).interp(lon=lon, lat=lat).values
@@ -340,7 +383,7 @@ def predict_at_point(
     times = pd.date_range(start, stop, freq=pd.Timedelta(minutes=dt))
     utc = times - pd.Timedelta(hours=time_zone)
     wl = predict(df.dropna(), utc) + offset
-    return pd.Series(wl, index=times, name="WL")
+    return pd.Series(wl, index=times, name={"z": "WL", "u": "U", "v": "V"}[quantity])
 
 
 def write_tekal_timeseries(filename: str, series: pd.Series, block_name: str) -> None:

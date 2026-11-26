@@ -67,6 +67,27 @@ tide models (local and remote via S3) and provides a higher-level interface:
    # List available models
    print(db.dataset_names)
 
+Tidal currents
+~~~~~~~~~~~~~~
+
+FES2014 also provides depth-averaged tidal currents, in the sub folders
+``eastward_velocity`` and ``northward_velocity`` of the dataset. Pass
+``quantity="u"`` or ``quantity="v"`` to get the constituents of the eastward or
+northward velocity (amplitudes in m/s); predicting with them gives the velocity
+component:
+
+.. code-block:: python
+
+   model = db.get_dataset("fes2014_extrap")
+   if model.has_currents:
+       dfs_u = model.get_data_on_points(x=[1.5], y=[51.0], crs=4326,
+                                        format="df", quantity="u")
+       dfs_v = model.get_data_on_points(x=[1.5], y=[51.0], crs=4326,
+                                        format="df", quantity="v")
+
+Unlike the water levels of ``fes2014_extrap``, the currents are not
+extrapolated onto land, so points close to the coast can give NaN.
+
 Tide station databases
 ----------------------
 
