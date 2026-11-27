@@ -100,19 +100,39 @@ class TideModelDatabase:
 
             if dataset_format.lower() == "fes2014":
                 model = TideModelFes2014(name, path)
-            elif dataset_format.lower() == "tpxo_old":
-                pass
+            else:
+                print(
+                    f"Tide model format {dataset_format} of dataset {name} is not "
+                    "supported ! Skipping dataset."
+                )
+                continue
 
-            # Hand the store endpoint down to the model (its s3_bucket/s3_key
-            # come from metadata.tml; a metadata-provided endpoint wins)
-            model.s3_endpoint = getattr(model, "s3_endpoint", None) or self.s3_endpoint
+            # A dataset that is downloaded from S3 (s3_bucket in its
+            # metadata.tml) is downloaded from the store of this database:
+            # its bucket, key prefix and endpoint win over the ones in
+            # metadata.tml, which may be out of date (e.g. after a move of the
+            # data to another bucket). A metadata-provided endpoint is only
+            # used when the database has none. Local-only datasets (no
+            # s3_bucket in metadata.tml) are left alone.
+            if self.s3_bucket and getattr(model, "s3_bucket", None):
+                model.s3_bucket = self.s3_bucket
+                model.s3_key = f"{self.s3_key}/{name}" if self.s3_key else name
+                model.s3_endpoint = self.s3_endpoint
+            else:
+                model.s3_endpoint = (
+                    getattr(model, "s3_endpoint", None) or self.s3_endpoint
+                )
             self.dataset.append(model)
 
     def check_online_database(self) -> None:
         """Synchronise the local database with the S3 bucket.
 
-        Downloads ``tide_models.tml`` from S3 and adds any new datasets
-        (metadata only) to the local database, then re-reads the database.
+        Downloads ``tide_models.tml`` from S3, adds any new datasets
+        (metadata only) to the local database and refreshes the
+        ``metadata.tml`` of the datasets that are already there (so that
+        changes in the bucket, e.g. new currents, reach existing installs),
+        then re-reads the database. If the download of a ``metadata.tml``
+        fails, the local copy is kept.
         """
         if self.s3_client is None:
             self.s3_client = boto3.client(
@@ -137,39 +157,61 @@ class TideModelDatabase:
             )
             return
 
-        short_name_list, long_name_list = self.dataset_names()
         datasets_s3 = toml.load(filename)
-        tide_models_added = False
+        local_path = {model.name: model.path for model in self.dataset}
         added_names = []
+        refreshed = False
         for d in datasets_s3["dataset"]:
             s3_name = d["name"]
-            if s3_name not in short_name_list:
+            key = f"{self.s3_key}/{s3_name}/metadata.tml"
+            if s3_name in local_path:
+                # Existing dataset: refresh its metadata
+                path = local_path[s3_name]
+            else:
                 print(f"Adding tide model {s3_name} to local database ...")
                 path = os.path.join(self.path, s3_name)
                 os.makedirs(path, exist_ok=True)
-                key = f"{self.s3_key}/{s3_name}/metadata.tml"
-                filename = os.path.join(path, "metadata.tml")
-                try:
-                    self.s3_client.download_file(
-                        Bucket=self.s3_bucket,
-                        Key=key,
-                        Filename=filename,
-                    )
-                except Exception as e:
-                    print(e)
+            filename = os.path.join(path, "metadata.tml")
+            # Download to a temporary file first, so that a failed download
+            # does not leave a broken metadata.tml behind
+            tmp_filename = filename + ".download"
+            try:
+                self.s3_client.download_file(
+                    Bucket=self.s3_bucket,
+                    Key=key,
+                    Filename=tmp_filename,
+                )
+                os.replace(tmp_filename, filename)
+            except Exception as e:
+                if os.path.exists(tmp_filename):
+                    os.remove(tmp_filename)
+                print(e)
+                if s3_name in local_path:
+                    print(f"Failed to download {key}. Keeping local metadata.")
+                else:
                     print(f"Failed to download {key}. Skipping tide model.")
-                    continue
-                tide_models_added = True
+                continue
+            if s3_name in local_path:
+                refreshed = True
+            else:
                 added_names.append(s3_name)
-        if tide_models_added:
-            d = {}
-            d["dataset"] = []
-            for name in short_name_list:
-                d["dataset"].append({"name": name})
-            for name in added_names:
-                d["dataset"].append({"name": name})
-            with open(os.path.join(self.path, "tide_models.tml"), "w") as tml:
-                toml.dump(d, tml)
+        if added_names:
+            # Append the new datasets as text, so that the existing entries
+            # (including any "path") stay exactly as they are. Writing the
+            # whole file with toml.dump would make Windows paths unreadable
+            # (the toml package does not escape backslashes such as "\U").
+            tml_file = os.path.join(self.path, "tide_models.tml")
+            listed = set()
+            if os.path.exists(tml_file):
+                listed = {
+                    entry.get("name")
+                    for entry in toml.load(tml_file).get("dataset", [])
+                }
+            with open(tml_file, "a") as tml:
+                for name in added_names:
+                    if name not in listed:
+                        tml.write(f'\n[[dataset]]\nname = "{name}"\n')
+        if added_names or refreshed:
             self.dataset = []
             self.read()
 
